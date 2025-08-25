@@ -1,33 +1,47 @@
-// main.js
-// Import necessary modules
 const express = require('express');
 const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
 
-// Create an Express application
 const app = express();
 const port = process.env.PORT || 3000;
 
+// Add middleware
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
+
 // Configure multer for file uploads
-// We'll store uploaded files in a directory named 'uploads'
 const upload = multer({ dest: 'uploads/' });
 
 // Serve static files from the 'public' directory
-// We'll place your index.html inside a 'public' folder
 app.use(express.static(path.join(__dirname, 'public')));
 
-/**
- * API endpoint to upload a vocabulary file.
- * It accepts a single file with the field name 'vocabFile'.
- */
+// Health check endpoint
+app.get('/', (req, res) => {
+    res.json({ 
+        message: 'Vocab Game Backend is running!',
+        timestamp: new Date().toISOString(),
+        status: 'OK',
+        version: '1.0.0',
+        endpoints: {
+            health: 'GET /',
+            upload: 'POST /api/upload'
+        }
+    });
+});
+
+// API endpoint to upload a vocabulary file
 app.post('/api/upload', upload.single('vocabFile'), (req, res) => {
+    console.log('Upload request received');
+    
     if (!req.file) {
         return res.status(400).json({ error: 'No file uploaded.' });
     }
 
     const filePath = req.file.path;
     const fileName = req.file.originalname;
+    
+    console.log(`Processing file: ${fileName}`);
 
     // Read the uploaded file content
     fs.readFile(filePath, 'utf8', (err, data) => {
@@ -50,8 +64,25 @@ app.post('/api/upload', upload.single('vocabFile'), (req, res) => {
             return res.status(400).json({ error: 'No valid vocabulary found in the file.' });
         }
 
+        console.log(`Parsed ${vocabulary.length} vocabulary items`);
+
         // Send the parsed vocabulary back to the client
-        res.json({ vocabulary });
+        res.json({ 
+            success: true,
+            count: vocabulary.length,
+            vocabulary 
+        });
+    });
+});
+
+// API endpoint to get server info
+app.get('/api/info', (req, res) => {
+    res.json({
+        name: 'Vocab Game Backend',
+        version: '1.0.0',
+        uptime: process.uptime(),
+        memory: process.memoryUsage(),
+        env: process.env.NODE_ENV || 'development'
     });
 });
 
@@ -89,14 +120,38 @@ function parseFile(content, fileName) {
         }
 
         if (word && phonetic && meaning) {
-            words.push({ id: Date.now() + index, word, phonetic, meaning });
+            words.push({ 
+                id: Date.now() + index, 
+                word, 
+                phonetic, 
+                meaning 
+            });
         }
     });
 
     return words;
 }
 
+// Error handling middleware
+app.use((err, req, res, next) => {
+    console.error(err.stack);
+    res.status(500).json({ 
+        error: 'Something went wrong!',
+        message: err.message 
+    });
+});
+
+// 404 handler
+app.use('*', (req, res) => {
+    res.status(404).json({ 
+        error: 'Route not found',
+        availableRoutes: ['GET /', 'POST /api/upload', 'GET /api/info']
+    });
+});
+
 // Start the server
 app.listen(port, () => {
-    console.log(`Server is running on port ${port}`);
+    console.log(`🚀 Server is running on port ${port}`);
+    console.log(`📝 Health check: http://localhost:${port}/`);
+    console.log(`📤 Upload API: http://localhost:${port}/api/upload`);
 });
