@@ -1,16 +1,12 @@
 {
   "name": "vocab-game-backend",
   "version": "1.0.0",
-  "description": "Backend for the vocabulary game",
-  "main": "index.js",
+  "main": "server.js",
   "scripts": {
-    "start": "node index.js"
+    "start": "node server.js"
   },
   "dependencies": {
     "express": "^4.19.2",
     "multer": "^1.4.5-lts.1"
-  },
-  "engines": {
-    "node": "20.x"
   }
 }
