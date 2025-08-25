@@ -3,321 +3,189 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>เกมคำศัพท์สุ่ม</title>
-    <script src="https://cdn.tailwindcss.com"></script>
+    <title>Vocabulary Game</title>
     <style>
-        @keyframes fadeIn {
-            from { opacity: 0; transform: translateY(-10px); }
-            to { opacity: 1; transform: translateY(0); }
-        }
-        .animate-fadeIn {
-            animation: fadeIn 0.3s ease-out;
-        }
-        .drag-active {
-            border-color: #dc2626 !important;
-            background-color: #fef2f2 !important;
-        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); min-height: 100vh; display: flex; justify-content: center; align-items: center; }
+        .container { background: white; padding: 2rem; border-radius: 15px; box-shadow: 0 10px 30px rgba(0,0,0,0.3); max-width: 600px; width: 90%; text-align: center; }
+        h1 { color: #333; margin-bottom: 1.5rem; font-size: 2.5rem; }
+        .upload-area { border: 3px dashed #667eea; border-radius: 10px; padding: 2rem; margin: 1.5rem 0; background: #f8f9ff; cursor: pointer; transition: all 0.3s; }
+        .upload-area:hover { border-color: #764ba2; background: #f0f2ff; }
+        .upload-area.dragover { border-color: #28a745; background: #e8f5e9; }
+        input[type="file"] { display: none; }
+        .btn { background: linear-gradient(45deg, #667eea, #764ba2); color: white; border: none; padding: 12px 30px; border-radius: 25px; cursor: pointer; font-size: 1.1rem; margin: 10px; transition: all 0.3s; }
+        .btn:hover { transform: translateY(-2px); box-shadow: 0 5px 15px rgba(0,0,0,0.2); }
+        .btn:disabled { opacity: 0.6; cursor: not-allowed; transform: none; }
+        .game-area { display: none; text-align: left; }
+        .word-card { background: #f8f9ff; border: 1px solid #e0e6ff; border-radius: 10px; padding: 1.5rem; margin: 1rem 0; }
+        .word { font-size: 1.8rem; font-weight: bold; color: #333; }
+        .phonetic { font-size: 1.2rem; color: #666; margin: 0.5rem 0; font-style: italic; }
+        .meaning { font-size: 1.1rem; color: #555; display: none; }
+        .score { font-size: 1.2rem; font-weight: bold; color: #667eea; margin: 1rem 0; }
+        .progress { width: 100%; height: 8px; background: #e0e6ff; border-radius: 4px; margin: 1rem 0; overflow: hidden; }
+        .progress-bar { height: 100%; background: linear-gradient(45deg, #667eea, #764ba2); transition: width 0.3s; }
+        .controls { margin: 1rem 0; }
+        .status { padding: 1rem; border-radius: 5px; margin: 1rem 0; }
+        .success { background: #d4edda; color: #155724; border: 1px solid #c3e6cb; }
+        .error { background: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; }
     </style>
 </head>
 <body>
-    <div class="min-h-screen bg-gradient-to-br from-red-50 to-rose-100 p-4">
-        <div class="max-w-4xl mx-auto">
-            <!-- Header -->
-            <div class="text-center mb-8">
-                <h1 class="text-4xl font-bold text-red-800 mb-2">🎯 เกมคำศัพท์สุ่ม</h1>
-                <p class="text-gray-600">อัปโหลดคำศัพท์ของคุณและเริ่มเรียนรู้!</p>
+    <div class="container">
+        <h1>🎯 Vocabulary Game</h1>
+        
+        <div id="uploadSection">
+            <div class="upload-area" onclick="document.getElementById('fileInput').click()">
+                <h3>📁 อัปโหลดไฟล์คำศัพท์</h3>
+                <p>คลิกที่นี่หรือลากไฟล์มาวาง</p>
+                <p><small>รองรับไฟล์ .csv และ .txt</small></p>
+                <input type="file" id="fileInput" accept=".csv,.txt" onchange="handleFile(this.files[0])">
+            </div>
+            <div id="status"></div>
+        </div>
+
+        <div id="gameSection" class="game-area">
+            <div class="score">
+                คะแนน: <span id="score">0</span> / <span id="total">0</span>
+                | ข้อที่: <span id="current">1</span>
+            </div>
+            
+            <div class="progress">
+                <div class="progress-bar" id="progressBar"></div>
             </div>
 
-            <!-- Upload Area -->
-            <div class="bg-white rounded-xl shadow-lg p-6 mb-6">
-                <div id="dropZone" class="border-2 border-dashed border-gray-300 hover:border-red-400 rounded-lg p-8 text-center transition-colors duration-200">
-                    <div class="text-6xl mb-4">📁</div>
-                    <h3 class="text-lg font-semibold text-gray-700 mb-2">อัปโหลดไฟล์คำศัพท์</h3>
-                    <p class="text-sm text-gray-500 mb-4">
-                        ลากและวางไฟล์ .csv หรือ .txt ที่นี่ หรือคลิกเพื่อเลือกไฟล์
-                    </p>
-                    <input type="file" accept=".csv,.txt" id="fileInput" class="hidden">
-                    <label for="fileInput" class="inline-flex items-center px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 cursor-pointer transition-colors">
-                        เลือกไฟล์
-                    </label>
-                </div>
-                
-                <div id="vocabularyInfo" class="mt-4 text-center hidden">
-                    <span class="text-sm text-gray-600">
-                        มีคำศัพท์ทั้งหมด: <strong id="wordCount">0</strong> คำ
-                    </span>
-                    <button id="toggleListBtn" class="text-sm text-red-600 hover:text-red-800 ml-4">
-                        ดูรายการ
-                    </button>
-                    <button id="clearAllBtn" class="text-sm text-red-600 hover:text-red-800 ml-4">
-                        ลบทั้งหมด
-                    </button>
-                </div>
+            <div class="word-card" id="wordCard">
+                <div class="word" id="currentWord">word</div>
+                <div class="phonetic" id="currentPhonetic">/phonetic/</div>
+                <div class="meaning" id="currentMeaning">meaning</div>
             </div>
 
-            <!-- Word List -->
-            <div id="wordList" class="bg-white rounded-xl shadow-lg p-6 mb-6 hidden">
-                <h3 class="text-lg font-semibold text-gray-800 mb-4">รายการคำศัพท์</h3>
-                <div class="max-h-60 overflow-y-auto">
-                    <div id="wordListContent" class="space-y-2">
-                        <!-- Word list items will be inserted here -->
-                    </div>
-                </div>
-            </div>
-
-            <!-- Game Area -->
-            <div id="gameArea" class="bg-white rounded-xl shadow-lg p-8 text-center">
-                <div class="mb-6">
-                    <button id="randomBtn" class="inline-flex items-center px-6 py-3 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors text-lg font-semibold">
-                        เริ่มเกม
-                    </button>
-                </div>
-
-                <div id="noVocabMessage" class="text-gray-500">
-                    <p>กรุณาอัปโหลดไฟล์คำศัพท์ก่อนเริ่มเกม</p>
-                </div>
-
-                <div id="currentWordArea" class="space-y-6 hidden">
-                    <!-- Current Word -->
-                    <div id="wordCard" class="bg-gradient-to-r from-red-600 to-rose-600 text-white p-8 rounded-2xl cursor-pointer hover:shadow-lg transform hover:scale-105 transition-all duration-200 shadow-red-200">
-                        <div id="currentWord" class="text-4xl font-bold mb-2"></div>
-                        <div id="currentPhonetic" class="text-xl font-mono mb-4 opacity-90"></div>
-                        <div class="text-lg opacity-80">คลิกเพื่อดูความหมาย</div>
-                    </div>
-
-                    <!-- Meaning -->
-                    <div id="meaningArea" class="bg-red-50 border-2 border-red-200 rounded-xl p-6 animate-fadeIn hidden">
-                        <div id="currentMeaning" class="text-2xl font-semibold text-red-800"></div>
-                    </div>
-
-                    <!-- Instructions -->
-                    <div id="instructions" class="text-gray-500 text-sm">
-                        คลิกที่คำศัพท์เพื่อดูความหมาย
-                    </div>
-                </div>
+            <div class="controls">
+                <button class="btn" onclick="showMeaning()">💡 ดูความหมาย</button>
+                <button class="btn" onclick="nextWord(true)">✅ รู้</button>
+                <button class="btn" onclick="nextWord(false)">❌ ไม่รู้</button>
+                <button class="btn" onclick="resetGame()">🔄 เริ่มใหม่</button>
             </div>
         </div>
     </div>
 
     <script>
-        // Global variables
         let vocabulary = [];
-        let currentWord = null;
-        let showMeaning = false;
-        let showWordList = false;
+        let currentIndex = 0;
+        let score = 0;
+        let showingMeaning = false;
 
-        // DOM elements
-        const dropZone = document.getElementById('dropZone');
-        const fileInput = document.getElementById('fileInput');
-        const vocabularyInfo = document.getElementById('vocabularyInfo');
-        const wordCount = document.getElementById('wordCount');
-        const toggleListBtn = document.getElementById('toggleListBtn');
-        const clearAllBtn = document.getElementById('clearAllBtn');
-        const wordList = document.getElementById('wordList');
-        const wordListContent = document.getElementById('wordListContent');
-        const randomBtn = document.getElementById('randomBtn');
-        const noVocabMessage = document.getElementById('noVocabMessage');
-        const currentWordArea = document.getElementById('currentWordArea');
-        const wordCard = document.getElementById('wordCard');
-        const currentWordEl = document.getElementById('currentWord');
-        const currentPhoneticEl = document.getElementById('currentPhonetic');
-        const meaningArea = document.getElementById('meaningArea');
-        const currentMeaningEl = document.getElementById('currentMeaning');
-        const instructions = document.getElementById('instructions');
+        // Drag and drop
+        const uploadArea = document.querySelector('.upload-area');
+        uploadArea.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            uploadArea.classList.add('dragover');
+        });
+        uploadArea.addEventListener('dragleave', () => {
+            uploadArea.classList.remove('dragover');
+        });
+        uploadArea.addEventListener('drop', (e) => {
+            e.preventDefault();
+            uploadArea.classList.remove('dragover');
+            const files = e.dataTransfer.files;
+            if (files.length > 0) handleFile(files[0]);
+        });
 
-        // File upload handler
-        async function handleFileUpload(file) {
+        function showStatus(message, type) {
+            const status = document.getElementById('status');
+            status.innerHTML = `<div class="${type}">${message}</div>`;
+            setTimeout(() => status.innerHTML = '', 3000);
+        }
+
+        async function handleFile(file) {
+            if (!file) return;
+            
             const formData = new FormData();
             formData.append('vocabFile', file);
+            
+            showStatus('🔄 กำลังประมวลผลไฟล์...', 'success');
 
             try {
                 const response = await fetch('/api/upload', {
                     method: 'POST',
-                    body: formData,
+                    body: formData
                 });
 
-                if (!response.ok) {
-                    const errorData = await response.json();
-                    throw new Error(errorData.error || 'Failed to upload file.');
-                }
-
-                const data = await response.json();
-                const newWords = data.vocabulary;
-
-                if (newWords.length > 0) {
-                    vocabulary = [...vocabulary, ...newWords];
-                    currentWord = null;
-                    showMeaning = false;
-                    updateUI();
-                    alert(`เพิ่มคำศัพท์ได้ ${newWords.length} คำ`);
+                const result = await response.json();
+                
+                if (response.ok && result.success) {
+                    vocabulary = result.vocabulary;
+                    showStatus(`✅ โหลดคำศัพท์สำเร็จ ${result.count} คำ`, 'success');
+                    startGame();
                 } else {
-                    alert('ไม่พบคำศัพท์ในไฟล์ กรุณาตรวจสอบรูปแบบไฟล์');
+                    showStatus(`❌ ${result.error || 'เกิดข้อผิดพลาด'}`, 'error');
                 }
             } catch (error) {
-                console.error('Upload error:', error);
-                alert(`เกิดข้อผิดพลาด: ${error.message}`);
+                showStatus('❌ ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้', 'error');
+                console.error('Error:', error);
             }
         }
 
-        // Drag and drop handlers
-        dropZone.addEventListener('dragover', (e) => {
-            e.preventDefault();
-            dropZone.classList.add('drag-active');
-        });
-
-        dropZone.addEventListener('dragleave', (e) => {
-            e.preventDefault();
-            dropZone.classList.remove('drag-active');
-        });
-
-        dropZone.addEventListener('drop', (e) => {
-            e.preventDefault();
-            dropZone.classList.remove('drag-active');
+        function startGame() {
+            currentIndex = 0;
+            score = 0;
+            showingMeaning = false;
             
-            const files = [...e.dataTransfer.files];
-            const file = files[0];
+            document.getElementById('uploadSection').style.display = 'none';
+            document.getElementById('gameSection').style.display = 'block';
             
-            if (file && (file.name.endsWith('.csv') || file.name.endsWith('.txt'))) {
-                handleFileUpload(file);
-            } else {
-                alert('กรุณาอัปโหลดไฟล์ .csv หรือ .txt เท่านั้น');
-            }
-        });
-
-        // File input handler
-        fileInput.addEventListener('change', (e) => {
-            const file = e.target.files[0];
-            if (file) handleFileUpload(file);
-        });
-
-        // Random word function
-        function randomWord() {
-            if (vocabulary.length > 0) {
-                const randomIndex = Math.floor(Math.random() * vocabulary.length);
-                currentWord = vocabulary[randomIndex];
-                showMeaning = false;
-                updateGameDisplay();
-            } else {
-                alert('กรุณาอัปโหลดไฟล์คำศัพท์ก่อนเริ่มเกม');
-            }
+            updateDisplay();
+            showCurrentWord();
         }
 
-        // Toggle meaning function
-        function toggleMeaning() {
-            showMeaning = !showMeaning;
-            updateMeaningDisplay();
-        }
-        
-        // Remove word function
-        function removeWord(id) {
-            vocabulary = vocabulary.filter(word => word.id !== id);
-            if (currentWord && currentWord.id === id) {
-                currentWord = null;
-                showMeaning = false;
-            }
-            updateUI();
-        }
-
-        // Clear all words
-        function clearAllWords() {
-            if (confirm('ต้องการลบคำศัพท์ทั้งหมดใช่ไหม?')) {
-                vocabulary = [];
-                currentWord = null;
-                showMeaning = false;
-                updateUI();
-            }
-        }
-
-        // Toggle word list
-        function toggleWordList() {
-            showWordList = !showWordList;
-            updateWordListDisplay();
-        }
-
-        // Update UI
-        function updateUI() {
-            if (vocabulary.length > 0) {
-                vocabularyInfo.classList.remove('hidden');
-                noVocabMessage.classList.add('hidden');
-                wordCount.textContent = vocabulary.length;
-            } else {
-                vocabularyInfo.classList.add('hidden');
-                noVocabMessage.classList.remove('hidden');
-                wordList.classList.add('hidden');
-                showWordList = false;
+        function showCurrentWord() {
+            if (currentIndex >= vocabulary.length) {
+                endGame();
+                return;
             }
 
-            updateWordListDisplay();
-            updateGameDisplay();
+            const word = vocabulary[currentIndex];
+            document.getElementById('currentWord').textContent = word.word;
+            document.getElementById('currentPhonetic').textContent = word.phonetic;
+            document.getElementById('currentMeaning').textContent = word.meaning;
+            document.getElementById('currentMeaning').style.display = 'none';
+            showingMeaning = false;
+            
+            updateDisplay();
         }
 
-        // Update word list display
-        function updateWordListDisplay() {
-            if (showWordList && vocabulary.length > 0) {
-                wordList.classList.remove('hidden');
-                toggleListBtn.textContent = 'ซ่อนรายการ';
-                
-                wordListContent.innerHTML = '';
-                vocabulary.forEach(word => {
-                    const wordItem = document.createElement('div');
-                    wordItem.className = 'flex items-center justify-between p-3 bg-gray-50 rounded-lg';
-                    wordItem.innerHTML = `
-                        <div>
-                            <span class="font-medium text-gray-800">${word.word}</span>
-                            <span class="text-red-600 ml-2 text-sm font-mono">[${word.phonetic}]</span>
-                            <span class="text-gray-500 ml-3">- ${word.meaning}</span>
-                        </div>
-                        <button onclick="removeWord(${word.id})" class="text-red-500 hover:text-red-700 p-1">
-                            ลบ
-                        </button>
-                    `;
-                    wordListContent.appendChild(wordItem);
-                });
-            } else {
-                wordList.classList.add('hidden');
-                toggleListBtn.textContent = 'ดูรายการ';
-            }
+        function updateDisplay() {
+            document.getElementById('score').textContent = score;
+            document.getElementById('total').textContent = vocabulary.length;
+            document.getElementById('current').textContent = currentIndex + 1;
+            
+            const progress = ((currentIndex) / vocabulary.length) * 100;
+            document.getElementById('progressBar').style.width = progress + '%';
         }
 
-        // Update game display
-        function updateGameDisplay() {
-            if (currentWord) {
-                currentWordArea.classList.remove('hidden');
-                randomBtn.innerHTML = 'สุ่มใหม่';
-                
-                currentWordEl.textContent = currentWord.word;
-                currentPhoneticEl.textContent = '[' + currentWord.phonetic + ']';
-                
-                updateMeaningDisplay();
-            } else {
-                currentWordArea.classList.add('hidden');
-                randomBtn.innerHTML = 'เริ่มเกม';
-            }
+        function showMeaning() {
+            document.getElementById('currentMeaning').style.display = 'block';
+            showingMeaning = true;
         }
 
-        // Update meaning display
-        function updateMeaningDisplay() {
-            if (showMeaning && currentWord) {
-                meaningArea.classList.remove('hidden');
-                currentMeaningEl.textContent = currentWord.meaning;
-                instructions.textContent = 'กดปุ่ม "สุ่มใหม่" เพื่อดูคำถัดไป';
-            } else {
-                meaningArea.classList.add('hidden');
-                instructions.textContent = 'คลิกที่คำศัพท์เพื่อดูความหมาย';
-            }
+        function nextWord(correct) {
+            if (correct) score++;
+            currentIndex++;
+            showCurrentWord();
         }
 
-        // Event listeners
-        randomBtn.addEventListener('click', randomWord);
-        wordCard.addEventListener('click', toggleMeaning);
-        toggleListBtn.addEventListener('click', toggleWordList);
-        clearAllBtn.addEventListener('click', clearAllWords);
+        function resetGame() {
+            document.getElementById('uploadSection').style.display = 'block';
+            document.getElementById('gameSection').style.display = 'none';
+            vocabulary = [];
+            document.getElementById('fileInput').value = '';
+        }
 
-        // Make removeWord function global
-        window.removeWord = removeWord;
-
-        // Initial UI update
-        updateUI();
+        function endGame() {
+            const percentage = Math.round((score / vocabulary.length) * 100);
+            alert(`🎉 เกมจบแล้ว!\n\nคะแนนของคุณ: ${score}/${vocabulary.length} (${percentage}%)\n\nคลิก OK เพื่อเริ่มใหม่`);
+            resetGame();
+        }
     </script>
 </body>
 </html>
