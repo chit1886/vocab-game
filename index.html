@@ -1,191 +1,84 @@
-<!DOCTYPE html>
-<html lang="th">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Vocabulary Game</title>
-    <style>
-        * { margin: 0; padding: 0; box-sizing: border-box; }
-        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); min-height: 100vh; display: flex; justify-content: center; align-items: center; }
-        .container { background: white; padding: 2rem; border-radius: 15px; box-shadow: 0 10px 30px rgba(0,0,0,0.3); max-width: 600px; width: 90%; text-align: center; }
-        h1 { color: #333; margin-bottom: 1.5rem; font-size: 2.5rem; }
-        .upload-area { border: 3px dashed #667eea; border-radius: 10px; padding: 2rem; margin: 1.5rem 0; background: #f8f9ff; cursor: pointer; transition: all 0.3s; }
-        .upload-area:hover { border-color: #764ba2; background: #f0f2ff; }
-        .upload-area.dragover { border-color: #28a745; background: #e8f5e9; }
-        input[type="file"] { display: none; }
-        .btn { background: linear-gradient(45deg, #667eea, #764ba2); color: white; border: none; padding: 12px 30px; border-radius: 25px; cursor: pointer; font-size: 1.1rem; margin: 10px; transition: all 0.3s; }
-        .btn:hover { transform: translateY(-2px); box-shadow: 0 5px 15px rgba(0,0,0,0.2); }
-        .btn:disabled { opacity: 0.6; cursor: not-allowed; transform: none; }
-        .game-area { display: none; text-align: left; }
-        .word-card { background: #f8f9ff; border: 1px solid #e0e6ff; border-radius: 10px; padding: 1.5rem; margin: 1rem 0; }
-        .word { font-size: 1.8rem; font-weight: bold; color: #333; }
-        .phonetic { font-size: 1.2rem; color: #666; margin: 0.5rem 0; font-style: italic; }
-        .meaning { font-size: 1.1rem; color: #555; display: none; }
-        .score { font-size: 1.2rem; font-weight: bold; color: #667eea; margin: 1rem 0; }
-        .progress { width: 100%; height: 8px; background: #e0e6ff; border-radius: 4px; margin: 1rem 0; overflow: hidden; }
-        .progress-bar { height: 100%; background: linear-gradient(45deg, #667eea, #764ba2); transition: width 0.3s; }
-        .controls { margin: 1rem 0; }
-        .status { padding: 1rem; border-radius: 5px; margin: 1rem 0; }
-        .success { background: #d4edda; color: #155724; border: 1px solid #c3e6cb; }
-        .error { background: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; }
-    </style>
-</head>
-<body>
-    <div class="container">
-        <h1>🎯 Vocabulary Game</h1>
+const express = require('express');
+const multer = require('multer');
+const path = require('path');
+const fs = require('fs');
+const app = express();
+const port = process.env.PORT || 3000;
+
+// Middleware
+app.use(express.json());
+app.use(express.static(__dirname)); // เพิ่มบรรทัดนี้
+
+app.use((req, res, next) => {
+    res.header('Access-Control-Allow-Origin', '*');
+    res.header('Access-Control-Allow-Headers', 'Content-Type');
+    next();
+});
+
+// Upload setup
+const upload = multer({ dest: 'uploads/' });
+
+// Routes
+app.get('/', (req, res) => {
+    res.sendFile(path.join(__dirname, 'index.html')); // เพิ่มบรรทัดนี้
+});
+
+app.post('/api/upload', upload.single('vocabFile'), (req, res) => {
+    if (!req.file) {
+        return res.status(400).json({ error: 'No file uploaded' });
+    }
+
+    const filePath = req.file.path;
+    const fileName = req.file.originalname;
+
+    fs.readFile(filePath, 'utf8', (err, data) => {
+        if (err) {
+            return res.status(500).json({ error: 'Error processing file' });
+        }
+
+        const vocabulary = parseFile(data, fileName);
         
-        <div id="uploadSection">
-            <div class="upload-area" onclick="document.getElementById('fileInput').click()">
-                <h3>📁 อัปโหลดไฟล์คำศัพท์</h3>
-                <p>คลิกที่นี่หรือลากไฟล์มาวาง</p>
-                <p><small>รองรับไฟล์ .csv และ .txt</small></p>
-                <input type="file" id="fileInput" accept=".csv,.txt" onchange="handleFile(this.files[0])">
-            </div>
-            <div id="status"></div>
-        </div>
+        fs.unlink(filePath, () => {});
 
-        <div id="gameSection" class="game-area">
-            <div class="score">
-                คะแนน: <span id="score">0</span> / <span id="total">0</span>
-                | ข้อที่: <span id="current">1</span>
-            </div>
-            
-            <div class="progress">
-                <div class="progress-bar" id="progressBar"></div>
-            </div>
-
-            <div class="word-card" id="wordCard">
-                <div class="word" id="currentWord">word</div>
-                <div class="phonetic" id="currentPhonetic">/phonetic/</div>
-                <div class="meaning" id="currentMeaning">meaning</div>
-            </div>
-
-            <div class="controls">
-                <button class="btn" onclick="showMeaning()">💡 ดูความหมาย</button>
-                <button class="btn" onclick="nextWord(true)">✅ รู้</button>
-                <button class="btn" onclick="nextWord(false)">❌ ไม่รู้</button>
-                <button class="btn" onclick="resetGame()">🔄 เริ่มใหม่</button>
-            </div>
-        </div>
-    </div>
-
-    <script>
-        let vocabulary = [];
-        let currentIndex = 0;
-        let score = 0;
-        let showingMeaning = false;
-
-        // Drag and drop
-        const uploadArea = document.querySelector('.upload-area');
-        uploadArea.addEventListener('dragover', (e) => {
-            e.preventDefault();
-            uploadArea.classList.add('dragover');
-        });
-        uploadArea.addEventListener('dragleave', () => {
-            uploadArea.classList.remove('dragover');
-        });
-        uploadArea.addEventListener('drop', (e) => {
-            e.preventDefault();
-            uploadArea.classList.remove('dragover');
-            const files = e.dataTransfer.files;
-            if (files.length > 0) handleFile(files[0]);
-        });
-
-        function showStatus(message, type) {
-            const status = document.getElementById('status');
-            status.innerHTML = `<div class="${type}">${message}</div>`;
-            setTimeout(() => status.innerHTML = '', 3000);
+        if (vocabulary.length === 0) {
+            return res.status(400).json({ error: 'No valid vocabulary found' });
         }
 
-        async function handleFile(file) {
-            if (!file) return;
-            
-            const formData = new FormData();
-            formData.append('vocabFile', file);
-            
-            showStatus('🔄 กำลังประมวลผลไฟล์...', 'success');
+        res.json({ success: true, count: vocabulary.length, vocabulary });
+    });
+});
 
-            try {
-                const response = await fetch('/api/upload', {
-                    method: 'POST',
-                    body: formData
-                });
+function parseFile(content, fileName) {
+    const lines = content.split('\n').filter(line => line.trim());
+    const words = [];
 
-                const result = await response.json();
-                
-                if (response.ok && result.success) {
-                    vocabulary = result.vocabulary;
-                    showStatus(`✅ โหลดคำศัพท์สำเร็จ ${result.count} คำ`, 'success');
-                    startGame();
-                } else {
-                    showStatus(`❌ ${result.error || 'เกิดข้อผิดพลาด'}`, 'error');
-                }
-            } catch (error) {
-                showStatus('❌ ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้', 'error');
-                console.error('Error:', error);
+    lines.forEach((line, index) => {
+        let word = '', phonetic = '', meaning = '';
+
+        if (fileName.endsWith('.csv')) {
+            const parts = line.split(',');
+            if (parts.length >= 3) {
+                word = parts[0].trim().replace(/"/g, '');
+                phonetic = parts[1].trim().replace(/"/g, '');
+                meaning = parts.slice(2).join(',').trim().replace(/"/g, '');
+            }
+        } else {
+            const parts = line.split(' - ');
+            if (parts.length >= 3) {
+                word = parts[0].trim();
+                phonetic = parts[1].trim();
+                meaning = parts.slice(2).join(' - ').trim();
             }
         }
 
-        function startGame() {
-            currentIndex = 0;
-            score = 0;
-            showingMeaning = false;
-            
-            document.getElementById('uploadSection').style.display = 'none';
-            document.getElementById('gameSection').style.display = 'block';
-            
-            updateDisplay();
-            showCurrentWord();
+        if (word && phonetic && meaning) {
+            words.push({ id: Date.now() + index, word, phonetic, meaning });
         }
+    });
 
-        function showCurrentWord() {
-            if (currentIndex >= vocabulary.length) {
-                endGame();
-                return;
-            }
+    return words;
+}
 
-            const word = vocabulary[currentIndex];
-            document.getElementById('currentWord').textContent = word.word;
-            document.getElementById('currentPhonetic').textContent = word.phonetic;
-            document.getElementById('currentMeaning').textContent = word.meaning;
-            document.getElementById('currentMeaning').style.display = 'none';
-            showingMeaning = false;
-            
-            updateDisplay();
-        }
-
-        function updateDisplay() {
-            document.getElementById('score').textContent = score;
-            document.getElementById('total').textContent = vocabulary.length;
-            document.getElementById('current').textContent = currentIndex + 1;
-            
-            const progress = ((currentIndex) / vocabulary.length) * 100;
-            document.getElementById('progressBar').style.width = progress + '%';
-        }
-
-        function showMeaning() {
-            document.getElementById('currentMeaning').style.display = 'block';
-            showingMeaning = true;
-        }
-
-        function nextWord(correct) {
-            if (correct) score++;
-            currentIndex++;
-            showCurrentWord();
-        }
-
-        function resetGame() {
-            document.getElementById('uploadSection').style.display = 'block';
-            document.getElementById('gameSection').style.display = 'none';
-            vocabulary = [];
-            document.getElementById('fileInput').value = '';
-        }
-
-        function endGame() {
-            const percentage = Math.round((score / vocabulary.length) * 100);
-            alert(`🎉 เกมจบแล้ว!\n\nคะแนนของคุณ: ${score}/${vocabulary.length} (${percentage}%)\n\nคลิก OK เพื่อเริ่มใหม่`);
-            resetGame();
-        }
-    </script>
-</body>
-</html>
+app.listen(port, () => {
+    console.log('Server running on port', port);
+});
