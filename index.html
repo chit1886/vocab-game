@@ -34,7 +34,9 @@
                     <div class="text-6xl mb-4">📁</div>
                     <h3 class="text-lg font-semibold text-gray-700 mb-2">อัปโหลดไฟล์คำศัพท์</h3>
                     <p class="text-sm text-gray-500 mb-4">
-                        ลากและวางไฟล์ .csv หรือ .txt ที่นี่ หรือคลิกเพื่อเลือกไฟล์
+                        รองรับไฟล์ .csv และ .txt<br>
+                        <strong>CSV:</strong> คำศัพท์,การออกเสียง,ความหมาย<br>
+                        <strong>TXT:</strong> คำศัพท์ - การออกเสียง - ความหมาย
                     </p>
                     <input type="file" accept=".csv,.txt" id="fileInput" class="hidden">
                     <label for="fileInput" class="inline-flex items-center px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 cursor-pointer transition-colors">
@@ -45,12 +47,16 @@
                 <div id="vocabularyInfo" class="mt-4 text-center hidden">
                     <span class="text-sm text-gray-600">
                         มีคำศัพท์ทั้งหมด: <strong id="wordCount">0</strong> คำ
+                        | เหลือ: <strong id="remainingCount">0</strong> คำ
                     </span>
                     <button id="toggleListBtn" class="text-sm text-red-600 hover:text-red-800 ml-4">
                         ดูรายการ
                     </button>
                     <button id="clearAllBtn" class="text-sm text-red-600 hover:text-red-800 ml-4">
                         ลบทั้งหมด
+                    </button>
+                    <button id="resetBtn" class="text-sm text-green-600 hover:text-green-800 ml-4">
+                        รีเซ็ต
                     </button>
                 </div>
             </div>
@@ -77,7 +83,18 @@
                     <p>กรุณาอัปโหลดไฟล์คำศัพท์ก่อนเริ่มเกม</p>
                 </div>
 
+                <div id="allWordsUsedMessage" class="text-orange-600 hidden">
+                    <p class="text-lg font-semibold mb-2">🎉 เรียนจบแล้ว!</p>
+                    <p>คุณได้เรียนคำศัพท์ครบทุกคำแล้ว</p>
+                    <p class="text-sm mt-2">กดปุ่ม "รีเซ็ต" เพื่อเริ่มเรียนใหม่</p>
+                </div>
+
                 <div id="currentWordArea" class="space-y-6 hidden">
+                    <!-- Progress Bar -->
+                    <div class="w-full bg-gray-200 rounded-full h-2 mb-4">
+                        <div id="progressBar" class="bg-red-600 h-2 rounded-full transition-all duration-300" style="width: 0%"></div>
+                    </div>
+                    
                     <!-- Current Word -->
                     <div id="wordCard" class="bg-gradient-to-r from-red-600 to-rose-600 text-white p-8 rounded-2xl cursor-pointer hover:shadow-lg transform hover:scale-105 transition-all duration-200 shadow-red-200">
                         <div id="currentWord" class="text-4xl font-bold mb-2"></div>
@@ -96,12 +113,38 @@
                     </div>
                 </div>
             </div>
+
+            <!-- Instructions -->
+            <div id="howToUse" class="bg-white rounded-xl shadow-lg p-6 text-center text-gray-600">
+                <h3 class="text-lg font-semibold mb-3">📋 วิธีการใช้งาน</h3>
+                <ol class="text-left space-y-2 max-w-md mx-auto">
+                    <li>1. อัปโหลดไฟล์คำศัพท์ (.csv หรือ .txt)</li>
+                    <li>2. กดปุ่ม "เริ่มเกม" เพื่อสุ่มคำศัพท์</li>
+                    <li>3. ดูการออกเสียง (Phonetic) ของคำศัพท์</li>
+                    <li>4. คลิกที่คำศัพท์เพื่อดูความหมาย</li>
+                    <li>5. กดปุ่ม "สุ่มใหม่" เพื่อทบทวนคำต่อไป</li>
+                    <li>6. คำที่สุ่มแล้วจะไม่แสดงซ้ำ</li>
+                    <li>7. กด "รีเซ็ต" เพื่อเริ่มเรียนใหม่</li>
+                </ol>
+            </div>
+
+            <!-- Developer Credit -->
+            <div class="mt-8 text-center">
+                <div class="bg-white rounded-lg shadow-md p-4 inline-block">
+                    <div class="text-sm text-gray-600">
+                        <p class="font-semibold text-red-800">พัฒนาโดย</p>
+                        <p class="text-red-700 font-medium">ดร.ชูชิต ชายทวีป</p>
+                        <p class="text-gray-600">คณะรัฐศาสตร์ มหาวิทยาลัยกรุงเทพธนบุรี</p>
+                    </div>
+                </div>
+            </div>
         </div>
     </div>
 
     <script>
         // Global variables
         let vocabulary = [];
+        let usedWords = []; // เก็บคำที่ใช้แล้ว
         let currentWord = null;
         let showMeaning = false;
         let showWordList = false;
@@ -111,52 +154,84 @@
         const fileInput = document.getElementById('fileInput');
         const vocabularyInfo = document.getElementById('vocabularyInfo');
         const wordCount = document.getElementById('wordCount');
+        const remainingCount = document.getElementById('remainingCount');
         const toggleListBtn = document.getElementById('toggleListBtn');
         const clearAllBtn = document.getElementById('clearAllBtn');
+        const resetBtn = document.getElementById('resetBtn');
         const wordList = document.getElementById('wordList');
         const wordListContent = document.getElementById('wordListContent');
+        const gameArea = document.getElementById('gameArea');
         const randomBtn = document.getElementById('randomBtn');
         const noVocabMessage = document.getElementById('noVocabMessage');
+        const allWordsUsedMessage = document.getElementById('allWordsUsedMessage');
         const currentWordArea = document.getElementById('currentWordArea');
+        const progressBar = document.getElementById('progressBar');
         const wordCard = document.getElementById('wordCard');
         const currentWordEl = document.getElementById('currentWord');
         const currentPhoneticEl = document.getElementById('currentPhonetic');
         const meaningArea = document.getElementById('meaningArea');
         const currentMeaningEl = document.getElementById('currentMeaning');
         const instructions = document.getElementById('instructions');
+        const howToUse = document.getElementById('howToUse');
+
+        // File parsing function
+        function parseFile(content, fileName) {
+            const lines = content.split('\n').filter(line => line.trim());
+            const words = [];
+
+            lines.forEach((line, index) => {
+                let word = '';
+                let phonetic = '';
+                let meaning = '';
+
+                if (fileName.endsWith('.csv')) {
+                    const parts = line.split(',');
+                    if (parts.length >= 3) {
+                        word = parts[0].trim().replace(/"/g, '');
+                        phonetic = parts[1].trim().replace(/"/g, '');
+                        meaning = parts.slice(2).join(',').trim().replace(/"/g, '');
+                    }
+                } else {
+                    // TXT format: word - phonetic - meaning
+                    const parts = line.split(' - ');
+                    if (parts.length >= 3) {
+                        word = parts[0].trim();
+                        phonetic = parts[1].trim();
+                        meaning = parts.slice(2).join(' - ').trim();
+                    }
+                }
+
+                if (word && phonetic && meaning) {
+                    words.push({ id: Date.now() + index, word, phonetic, meaning });
+                }
+            });
+
+            return words;
+        }
 
         // File upload handler
-        async function handleFileUpload(file) {
-            const formData = new FormData();
-            formData.append('vocabFile', file);
-
-            try {
-                const response = await fetch('/api/upload', {
-                    method: 'POST',
-                    body: formData,
-                });
-
-                if (!response.ok) {
-                    const errorData = await response.json();
-                    throw new Error(errorData.error || 'Failed to upload file.');
+        function handleFileUpload(file) {
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                try {
+                    const content = e.target.result;
+                    const newWords = parseFile(content, file.name);
+                    
+                    if (newWords.length > 0) {
+                        vocabulary = [...vocabulary, ...newWords];
+                        usedWords = []; // รีเซ็ตคำที่ใช้แล้ว
+                        currentWord = null;
+                        showMeaning = false;
+                        updateUI();
+                        alert(`เพิ่มคำศัพท์ได้ ${newWords.length} คำ`);
+                    } else {
+                        alert('ไม่พบคำศัพท์ในไฟล์ กรุณาตรวจสอบรูปแบบไฟล์');
+                    }
+                } catch (error) {
+                    alert('เกิดข้อผิดพลาดในการอ่านไฟล์');
                 }
-
-                const data = await response.json();
-                const newWords = data.vocabulary;
-
-                if (newWords.length > 0) {
-                    vocabulary = [...vocabulary, ...newWords];
-                    currentWord = null;
-                    showMeaning = false;
-                    updateUI();
-                    alert(`เพิ่มคำศัพท์ได้ ${newWords.length} คำ`);
-                } else {
-                    alert('ไม่พบคำศัพท์ในไฟล์ กรุณาตรวจสอบรูปแบบไฟล์');
-                }
-            } catch (error) {
-                console.error('Upload error:', error);
-                alert(`เกิดข้อผิดพลาด: ${error.message}`);
-            }
+            };
+            reader.readAsText(file, 'UTF-8');
         }
 
         // Drag and drop handlers
@@ -190,15 +265,48 @@
             if (file) handleFileUpload(file);
         });
 
+        // Get available words (ที่ยังไม่ได้ใช้)
+        function getAvailableWords() {
+            return vocabulary.filter(word => !usedWords.find(used => used.id === word.id));
+        }
+
         // Random word function
         function randomWord() {
-            if (vocabulary.length > 0) {
-                const randomIndex = Math.floor(Math.random() * vocabulary.length);
-                currentWord = vocabulary[randomIndex];
+            const availableWords = getAvailableWords();
+            
+            if (availableWords.length > 0) {
+                const randomIndex = Math.floor(Math.random() * availableWords.length);
+                currentWord = availableWords[randomIndex];
+                usedWords.push(currentWord); // เพิ่มคำนี้เข้าไปในรายการที่ใช้แล้ว
                 showMeaning = false;
                 updateGameDisplay();
+                updateProgress();
+            } else if (vocabulary.length > 0) {
+                // ถ้าใช้คำหมดแล้ว
+                currentWord = null;
+                showAllWordsUsed();
             } else {
                 alert('กรุณาอัปโหลดไฟล์คำศัพท์ก่อนเริ่มเกม');
+            }
+        }
+
+        // Show all words used message
+        function showAllWordsUsed() {
+            currentWordArea.classList.add('hidden');
+            allWordsUsedMessage.classList.remove('hidden');
+            randomBtn.innerHTML = 'เริ่มเกม';
+        }
+
+        // Reset used words
+        function resetUsedWords() {
+            if (vocabulary.length > 0) {
+                if (confirm('ต้องการรีเซ็ตและเริ่มเรียนใหม่ใช่ไหม?')) {
+                    usedWords = [];
+                    currentWord = null;
+                    showMeaning = false;
+                    allWordsUsedMessage.classList.add('hidden');
+                    updateUI();
+                }
             }
         }
 
@@ -207,10 +315,11 @@
             showMeaning = !showMeaning;
             updateMeaningDisplay();
         }
-        
+
         // Remove word function
         function removeWord(id) {
             vocabulary = vocabulary.filter(word => word.id !== id);
+            usedWords = usedWords.filter(word => word.id !== id);
             if (currentWord && currentWord.id === id) {
                 currentWord = null;
                 showMeaning = false;
@@ -222,6 +331,7 @@
         function clearAllWords() {
             if (confirm('ต้องการลบคำศัพท์ทั้งหมดใช่ไหม?')) {
                 vocabulary = [];
+                usedWords = [];
                 currentWord = null;
                 showMeaning = false;
                 updateUI();
@@ -234,21 +344,41 @@
             updateWordListDisplay();
         }
 
+        // Update progress bar
+        function updateProgress() {
+            if (vocabulary.length > 0) {
+                const progress = (usedWords.length / vocabulary.length) * 100;
+                progressBar.style.width = progress + '%';
+            }
+        }
+
         // Update UI
         function updateUI() {
+            // Update word count and show/hide elements
             if (vocabulary.length > 0) {
                 vocabularyInfo.classList.remove('hidden');
+                howToUse.classList.add('hidden');
                 noVocabMessage.classList.add('hidden');
                 wordCount.textContent = vocabulary.length;
+                remainingCount.textContent = getAvailableWords().length;
+                
+                if (getAvailableWords().length === 0 && vocabulary.length > 0) {
+                    showAllWordsUsed();
+                } else {
+                    allWordsUsedMessage.classList.add('hidden');
+                }
             } else {
                 vocabularyInfo.classList.add('hidden');
+                howToUse.classList.remove('hidden');
                 noVocabMessage.classList.remove('hidden');
+                allWordsUsedMessage.classList.add('hidden');
                 wordList.classList.add('hidden');
                 showWordList = false;
             }
 
             updateWordListDisplay();
             updateGameDisplay();
+            updateProgress();
         }
 
         // Update word list display
@@ -259,11 +389,15 @@
                 
                 wordListContent.innerHTML = '';
                 vocabulary.forEach(word => {
+                    const isUsed = usedWords.find(used => used.id === word.id);
                     const wordItem = document.createElement('div');
-                    wordItem.className = 'flex items-center justify-between p-3 bg-gray-50 rounded-lg';
+                    wordItem.className = `flex items-center justify-between p-3 rounded-lg ${
+                        isUsed ? 'bg-green-50 border border-green-200' : 'bg-gray-50'
+                    }`;
                     wordItem.innerHTML = `
-                        <div>
-                            <span class="font-medium text-gray-800">${word.word}</span>
+                        <div class="flex items-center">
+                            ${isUsed ? '<span class="text-green-600 mr-2">✓</span>' : ''}
+                            <span class="font-medium ${isUsed ? 'text-green-800' : 'text-gray-800'}">${word.word}</span>
                             <span class="text-red-600 ml-2 text-sm font-mono">[${word.phonetic}]</span>
                             <span class="text-gray-500 ml-3">- ${word.meaning}</span>
                         </div>
@@ -312,6 +446,7 @@
         wordCard.addEventListener('click', toggleMeaning);
         toggleListBtn.addEventListener('click', toggleWordList);
         clearAllBtn.addEventListener('click', clearAllWords);
+        resetBtn.addEventListener('click', resetUsedWords);
 
         // Make removeWord function global
         window.removeWord = removeWord;
